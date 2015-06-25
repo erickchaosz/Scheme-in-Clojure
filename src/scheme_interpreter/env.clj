@@ -30,42 +30,6 @@
       (conj base-env new-frame))
     (throw (Exception. "Number of variables and values should be equal"))))
 
-
-(defn lookup-variable-value
-  [var env]
-  (if (empty? env)
-    (throw (Exception. "Unbound variable"))
-    (let [current-frame (first-frame env)
-          val (get @current-frame var)
-          rest-env (enclosing-env env)]
-      (if val
-        val
-        (recur var rest-env)))))
-
-(defn set-variable-value!
-  [var val env]
-  (if (empty? env)
-    (throw (Exception. "Unbound variable"))
-    (let [current-frame (first-frame env)
-          val? (get @current-frame var)
-          rest-env (enclosing-env env)]
-      (if val?
-        (swap! current-frame
-                 (fn [frame]
-                   (assoc frame var val)))
-        (recur var val rest-env)
-        ))))
-
-
-(defn define-variable!
-  [var val env]
-  (let [current-frame (first-frame env)
-        val? (get @current-frame var)
-        rest-env (enclosing-env env)]
-    (swap! current-frame
-           (fn [frame]
-             (assoc frame var val)))))
-
 (defn- env-loop
   "Do found does things if found else do-nil"
   [var val env do-found do-nil exception]
