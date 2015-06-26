@@ -33,7 +33,7 @@
   "Do found does things if found else do-nil"
   [var val env do-found do-nil exception]
    (if (empty? env)
-     (exception)
+     (exception var)
     (let [current-frame (first-frame env)
           val? (get @current-frame var)
           rest-env (enclosing-env env)]
@@ -49,8 +49,8 @@
                      (get @current-frame var)))
         do-nil (fn [new-env]
                  (lookup-variable-value var (enclosing-env new-env)))
-        exception (fn []
-                    (throw (Exception. "Unbound variable")))]
+        exception (fn [var]
+                    (throw (Exception. (str "Unbound variable " var))))]
     (env-loop var nil env do-found do-nil exception)))
 
 (defn set-variable-value!
@@ -59,8 +59,8 @@
                     (add-binding-to-frame! var val(first-frame new-env)))
          do-nil (fn [new-env]
                   (set-variable-value! var val (enclosing-env new-env)))
-         exception (fn []
-                     (throw (Exception. "Unbound variable")))]
+         exception (fn [var]
+                     (throw (Exception. (str "Unbound variable" var))))]
      (env-loop var val env do-found do-nil exception)))
 
 (defn define-variable!
@@ -68,6 +68,6 @@
   (let [do-found (fn [new-env]
                    (add-binding-to-frame! var val(first-frame new-env)))
         do-nil do-found
-        exception (fn []
+        exception (fn [var]
                     (throw (Exception. "No Frame")))]
     (env-loop var val env do-found do-nil exception)))
