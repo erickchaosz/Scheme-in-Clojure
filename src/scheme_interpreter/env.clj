@@ -1,14 +1,13 @@
-(ns env.core
+(ns scheme-interpreter.env
   (:gen-class))
 
+(def empty-env (list))
 (defn enclosing-env [env] (rest env))
 (defn first-frame [env] (first env))
 
 (defn add-binding-to-frame!
   [var val frame]
-  (swap! frame
-          (fn [frame]
-            (assoc frame var val))))
+  (swap! frame assoc var val))
 
 
 (defn make-frame
