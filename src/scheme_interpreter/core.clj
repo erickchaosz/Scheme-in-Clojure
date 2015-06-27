@@ -8,15 +8,19 @@
          self-evaluating?
          variable?
          operands operator
+         primitive-proc? primitive-body
+
+         compound-proc? proc-body proc-params proc-env
+         
          make-procedure
          tagged-list?
-
+         
          quoted? quoted-expression
          assignment? assignment-var assignment-val eval-assignment
-         definition? definition-var definition-val eval-definition
+         definition? definition-var definition-val eval-definition 
          if? if-predicate if-action if-alternative eval-if
-         lambda?
-         begin? eval-sequence last-expression? first-expression rest-expressions
+         lambda? lambda-params lambda-body make-lambda
+         begin? eval-sequence last-expression? first-expression rest-expressions get-sequence
          cond?
          application?
          )
@@ -40,7 +44,7 @@
 ;;TO BE CHANGED 
 (def initial-env
   (let [vars (map (comp first keys) primitives)
-        vals (map (comp first vals) primitives)]
+        vals (map (fn [primitive] (list 'primitive ((comp first vals) primitive))) primitives)]
     (environ/extend-env vars vals initial-env)))
 
 (defn eval
@@ -51,6 +55,9 @@
         (assignment? exp) (eval-assignment exp env)
         (definition? exp) (eval-definition exp env)
         (if? exp) (eval-if exp env)
+        (lambda? exp) (make-procedure (lambda-params exp)
+                                      (lambda-body exp)
+                                      env)
         (begin? exp) (eval-sequence (get-sequence exp) env)
         :else (apply (eval (operator exp) env)
                      (map (fn [exp]
@@ -58,8 +65,13 @@
 
 (defn apply
   [procedure arguments]
-  (apply-in-underlying-clojure procedure arguments))
-
+  (if (primitive-proc? procedure)
+    (apply-in-underlying-clojure (primitive-body procedure) arguments)
+    (eval-sequence
+     (proc-body procedure)
+     (environ/extend-env (proc-params procedure)
+                         arguments
+                         (proc-env procedure)))))
 
 (defn operator
   [exp]
@@ -72,6 +84,14 @@
 (defn make-procedure
   [parameters body env]
   (list 'procedure parameters body env))
+
+(defn primitive-proc? [exp] (tagged-list? exp 'primitive))
+(defn primitive-body [exp] (first (rest exp)))
+
+(defn compound-proc? [exp] (tagged-list? exp 'procedure))
+(defn proc-params [exp] (first (rest exp)))
+(defn proc-body [exp] (first (rest (rest exp))))
+(defn proc-env [exp] (first (rest (rest (rest exp)))))
 
 (defn self-evaluating?
   [exp]
@@ -118,14 +138,28 @@
   [exp]
   (tagged-list? exp 'define))
 
-(defn definition-var [exp] (first (rest exp)))
+(defn definition-var [exp]
+  (let [var (first (rest exp))]
+    (if (seq? var)
+      (first var)
+      var)))
+
 (defn definition-val [exp] (first (rest (rest exp))))
+
+(defn definition-val [exp]
+  (let [var (first (rest exp))
+        def-body (first (rest (rest exp)))]
+    (if (seq? var)
+      (let [def-params (rest var)]
+        (make-lambda def-params def-body))
+      def-body)))
 
 (defn eval-definition
   [exp env]
   (let [var (definition-var exp)
         val (eval (definition-val exp) env)]
-    (do (environ/define-variable! var val env)
+    (do
+      (environ/define-variable! var val env)
         var)))
 
 (defn if? [exp] (tagged-list? exp 'if))
@@ -138,6 +172,12 @@
   (if (eval (if-predicate exp) env)
     (eval (if-action exp) env)
     (eval (if-alternative exp) env)))
+
+(defn lambda? [exp] (tagged-list? exp 'lambda))
+(defn lambda-params [exp] (first (rest exp)))
+(defn lambda-body [exp] (rest (rest exp)))
+(defn make-lambda [params body] (list 'lambda params body))
+
 
 (defn begin? [exp] (tagged-list? exp 'begin))
 (defn get-sequence [exp] (rest exp))
