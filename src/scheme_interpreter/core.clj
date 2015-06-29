@@ -14,14 +14,14 @@
          
          make-procedure
          tagged-list?
-         
+         sequence->exp
          quoted? quoted-expression
          assignment? assignment-var assignment-val eval-assignment
          definition? definition-var definition-val eval-definition 
          if? if-predicate if-action if-alternative eval-if
          lambda? lambda-params lambda-body make-lambda
          begin? eval-sequence last-expression? first-expression rest-expressions get-sequence
-         cond?
+         cond? cond-clauses cond-predicate cond-body last-cond? cond->if expand-cond-clauses       let?
          application?
          )
 
@@ -36,6 +36,9 @@
         {'* *}
         {'true true}
         {'false false}
+        {'> >}
+        {'< <}
+        {'= =}
         {'list list}
         {'cons cons}
         {'display print}
@@ -55,6 +58,7 @@
         (assignment? exp) (eval-assignment exp env)
         (definition? exp) (eval-definition exp env)
         (if? exp) (eval-if exp env)
+        (cond? exp) (eval (cond->if exp) env)
         (lambda? exp) (make-procedure (lambda-params exp)
                                       (lambda-body exp)
                                       env)
@@ -144,14 +148,13 @@
       (first var)
       var)))
 
-(defn definition-val [exp] (first (rest (rest exp))))
-
 (defn definition-val [exp]
   (let [var (first (rest exp))
-        def-body (first (rest (rest exp)))]
+        def-body (sequence->exp (rest (rest exp)))]
     (if (seq? var)
       (let [def-params (rest var)]
-        (make-lambda def-params def-body))
+        (do
+          (make-lambda def-params def-body)))
       def-body)))
 
 (defn eval-definition
@@ -166,6 +169,8 @@
 (defn if-predicate [exp] (first (rest exp)))
 (defn if-action [exp] (first (rest (rest exp))))
 (defn if-alternative [exp] (first (rest (rest (rest exp)))))
+
+(defn make-if [pred action alternative] (list 'if pred action alternative))
 
 (defn eval-if
   [exp env]
@@ -192,6 +197,36 @@
     (do (eval (first-expression exp) env)
         (recur (rest exp) env ))))
 
+(defn sequence->exp [exp]
+  (if (last-expression? exp)
+    (first exp)
+    (cons 'begin exp)))
+
+(defn cond? [exp] (tagged-list? exp 'cond))
+(defn cond-clauses [exp] (rest exp))
+(defn cond-predicate [exp] (first exp))
+(defn cond-body [exp] (rest exp))
+(defn last-cond? [exp] )
+ 
+(defn cond->if [exp]
+  (expand-cond-clauses (cond-clauses exp)))
+
+(defn expand-cond-clauses [clauses]
+  (let [curr-clause (first clauses)
+        curr-body (sequence->exp (cond-body curr-clause))]
+    (if (empty? clauses)
+      nil
+      (if (tagged-list? curr-clause 'else)
+        (make-if true curr-body curr-body)
+        (make-if (cond-predicate curr-clause)
+                 curr-body
+                 (expand-cond-clauses (rest clauses)))))))
+
+(defn let? [exp] (tagged-list? exp 'let))
+(defn )
+
+
 (defn -main
   "Runs the read-eval-print-loop"
   [& args])
+
