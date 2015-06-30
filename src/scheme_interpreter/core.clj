@@ -21,13 +21,19 @@
          if? if-predicate if-action if-alternative eval-if
          lambda? lambda-params lambda-body make-lambda
          begin? eval-sequence last-expression? first-expression rest-expressions get-sequence
-         cond? cond-clauses cond-predicate cond-body last-cond? cond->if expand-cond-clauses       let?
+         cond? cond-clauses cond-predicate cond-body last-cond? cond->if expand-cond-clauses
+         let? let->combination expand-let-clauses
          application?
          )
 
 (def initial-env environ/empty-env)
 
 (def apply-in-underlying-clojure clojure.core/apply)
+
+(defn empty-coll? [items]
+  (if (seq? items)
+    (empty? items)
+    false))
 
 (def primitives
   (list {'+ +}
@@ -39,8 +45,16 @@
         {'> >}
         {'< <}
         {'= =}
+        {'null? empty-coll?}
+        {'nil (list)}
+        {'remainder rem}
+        {'car first}
+        {'cdr rest}
         {'list list}
         {'cons cons}
+        {'not not}
+        {'pair? seq?}
+        {'append concat}
         {'display print}
         {'newline (fn [] (println ""))}))
 
@@ -53,12 +67,14 @@
 (defn eval
   [exp env]
   (cond (self-evaluating? exp) exp
+        (nil? exp) (list)
         (variable? exp) (environ/lookup-variable-value exp env)
         (quoted? exp) (quoted-expression exp)
         (assignment? exp) (eval-assignment exp env)
         (definition? exp) (eval-definition exp env)
         (if? exp) (eval-if exp env)
         (cond? exp) (eval (cond->if exp) env)
+        (let? exp) (eval (let->combination exp) env)
         (lambda? exp) (make-procedure (lambda-params exp)
                                       (lambda-body exp)
                                       env)
@@ -108,7 +124,7 @@
 
 (defn variable?
   [exp]
-  (symbol? exp))
+  (or (symbol? exp) (nil? exp)))
 
 (defn tagged-list?
   [exp tag]
@@ -223,8 +239,21 @@
                  (expand-cond-clauses (rest clauses)))))))
 
 (defn let? [exp] (tagged-list? exp 'let))
-(defn )
+(defn let-clauses [exp] (rest exp))
+(defn let-bindings [exp] (first exp))
+(defn let-body [exp] (rest exp))
 
+(defn let->combination [exp]
+  (let [clauses (let-clauses exp)
+        bindings (let-bindings clauses)
+        body (sequence->exp (let-body clauses))]
+    (expand-let-clauses bindings body)))
+
+(defn expand-let-clauses [bindings body]
+  (let [let-vars (map first bindings)
+        let-actions (map (comp first rest) bindings)]
+    (concat (list (list 'lambda let-vars body))
+            let-actions)))
 
 (defn -main
   "Runs the read-eval-print-loop"
