@@ -1,4 +1,4 @@
-# scheme-interpreter
+# Scheme Interpreter in Clojure
 
 Scheme interpreter written in Clojure
 based of the SICP textbook.
@@ -9,13 +9,13 @@ based of the SICP textbook.
 
 ## Features
 
-*define
-*lambda
-*if
-*cond
-*let
-*begin
-*quote
-*set!
-*and
-*or
+* define
+* lambda
+* if
+* cond
+* let
+* begin
+* quote
+* set!
+* and
+* or
