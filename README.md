@@ -1,36 +1,21 @@
 # scheme-interpreter
 
-FIXME: description
-
-## Installation
-
-Download from http://example.com/FIXME.
+Scheme interpreter written in Clojure
+based of the SICP textbook.
 
 ## Usage
 
-FIXME: explanation
+"lein run" in the command line after cd-ing to the directory
 
-    $ java -jar scheme-interpreter-0.1.0-standalone.jar [args]
+## Features
 
-## Options
-
-FIXME: listing of options this app accepts.
-
-## Examples
-
-...
-
-### Bugs
-
-...
-
-### Any Other Sections
-### That You Think
-### Might be Useful
-
-## License
-
-Copyright © 2015 FIXME
-
-Distributed under the Eclipse Public License either version 1.0 or (at
-your option) any later version.
+*define
+*lambda
+*if
+*cond
+*let
+*begin
+*quote
+*set!
+*and
+*or

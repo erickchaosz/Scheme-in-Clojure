@@ -191,3 +191,76 @@
          
          )))
  
+(deftest two-three-one
+ (testing "2.3.1"
+    (are [result exp] (= result (si/eval (read-string exp) si/initial-env
+                                 ))
+         'a "(define a 1)"
+         'b "(define b 2)"
+         '(1 2) "(list a b)"
+         '(a b) "(list 'a 'b)"
+         '(a 2) "(list 'a b)"
+         'a "(car '(a b c))"
+         '(b c) "(cdr '(a b c))"
+         'memq "(define (memq item x)
+  (cond ((null? x) false)
+        ((eq? item (car x)) x)
+        (else (memq item (cdr x)))))"
+         'false "(memq 'apple '(pear banana prune))"
+         '(apple pear) "(memq 'apple '(x (apple sauce) y apple pear))"
+         'equal? "(define (equal? x y)
+  (cond ((pair? x) (and (pair? y)
+                        (equal? (car x) (car y))
+                        (equal? (cdr x) (cdr y))))
+        ((null? x) (null? y))
+        (else (eq? x y))))"
+        
+
+         )))
+         
+(deftest Peter-Norvig-tests
+ (testing "From Peter Norvig http://norvig.com/lispy2.html"
+    (are [result exp] (= result (si/eval (read-string exp) si/initial-env
+                                 ))
+         'square "(define square (lambda (x) (* x x)))"
+         'double "(define double (lambda (x) (* 2 x)))"
+         10 "(double 5)"
+         'compose "(define compose (lambda (f g) (lambda (x) (f (g x)))))"
+         '(10) "((compose list double) 5)"
+         'apply-twice "(define apply-twice (lambda (f) (compose f f)))"
+         20 "((apply-twice double) 5)"
+         80 "((apply-twice (apply-twice double)) 5)"
+         'fact "(define fact (lambda (n) (if (<= n 1) 1 (* n (fact (- n 1))))))"
+         6 "(fact 3)"
+         'combine "(define (combine f)
+  (lambda (x y)
+    (if (null? x) nil
+      (f (list (car x) (car y))
+         ((combine f) (cdr x) (cdr y))))))"
+         'zip "(define zip (combine cons))"
+         '((1 5) (2 6) (3 7) (4 8)) "(zip (list 1 2 3 4) (list 5 6 7 8))"
+         'riff-shuffle "(define riff-shuffle (lambda (deck) (begin
+    (define take (lambda (n seq) (if (<= n 0) (quote ()) (cons (car seq) (take (- n 1) (cdr seq))))))
+    (define drop (lambda (n seq) (if (<= n 0) seq (drop (- n 1) (cdr seq)))))
+    (define mid (lambda (seq) (/ (length seq) 2)))
+    ((combine append) (take (mid deck) deck) (drop (mid deck) deck)))))"
+         '(1 5 2 6 3 7 4 8) "(riff-shuffle (list 1 2 3 4 5 6 7 8))"
+         '(1 3 5 7 2 4 6 8) "((apply-twice riff-shuffle) (list 1 2 3 4 5 6 7 8))"
+         '(1 2 3 4 5 6 7 8) "(riff-shuffle (riff-shuffle (riff-shuffle (list 1 2 3 4 5 6 7 8))))"
+         4 "(apply square '(2))"
+         10 "(apply + '(1 2 3 4))"
+         '(1 2 3 4) "(apply (if false + append) '((1 2) (3 4)))"
+         1 "(if 0 1 2)"
+         1 "(if '() 1 2)"
+         'true "(or false true)"
+         'false "(or)"
+         'true "(and)"
+         1 "(or 1 2 3)"
+         3 "(and 1 2 3)"
+         'false "(and false (/ 1 0))"
+         3 "(or 3 (/ 1 0))"
+         'hello "(or (quote hello) (quote world))"
+         1 "(if nil 1 2)"
+         1 "(if 0 1 2)"
+         
+         )))

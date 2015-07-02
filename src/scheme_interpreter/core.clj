@@ -4,7 +4,7 @@
   (:gen-class))
 
 
-(declare eval apply
+(declare eval apply apply-in-underlying-clojure
          self-evaluating?
          variable?
          operands operator
@@ -23,46 +23,11 @@
          begin? eval-sequence last-expression? first-expression rest-expressions get-sequence
          cond? cond-clauses cond-predicate cond-body last-cond? cond->if expand-cond-clauses
          let? let->combination expand-let-clauses
+         and? expand-and-clauses and->combination
+         or? expand-or-clauses or->combination
          application?
          )
 
-(def initial-env environ/empty-env)
-
-(def apply-in-underlying-clojure clojure.core/apply)
-
-(defn empty-coll? [items]
-  (if (seq? items)
-    (empty? items)
-    false))
-
-(def primitives
-  (list {'+ +}
-        {'- -}
-        {'/ /}
-        {'* *}
-        {'true true}
-        {'false false}
-        {'> >}
-        {'< <}
-        {'= =}
-        {'null? empty-coll?}
-        {'nil (list)}
-        {'remainder rem}
-        {'car first}
-        {'cdr rest}
-        {'list list}
-        {'cons cons}
-        {'not not}
-        {'pair? seq?}
-        {'append concat}
-        {'display print}
-        {'newline (fn [] (println ""))}))
-
-;;TO BE CHANGED 
-(def initial-env
-  (let [vars (map (comp first keys) primitives)
-        vals (map (fn [primitive] (list 'primitive ((comp first vals) primitive))) primitives)]
-    (environ/extend-env vars vals initial-env)))
 
 (defn eval
   [exp env]
@@ -79,6 +44,8 @@
                                       (lambda-body exp)
                                       env)
         (begin? exp) (eval-sequence (get-sequence exp) env)
+        (and? exp) (eval (and->combination exp) env)
+        (or? exp) (eval (or->combination exp) env)
         :else (apply (eval (operator exp) env)
                      (map (fn [exp]
                             (eval exp env)) (operands exp)))))
@@ -92,6 +59,13 @@
      (environ/extend-env (proc-params procedure)
                          arguments
                          (proc-env procedure)))))
+
+(def apply-in-underlying-clojure clojure.core/apply)
+
+(defn empty-coll? [items]
+  (if (seq? items)
+    (empty? items)
+    false))
 
 (defn operator
   [exp]
@@ -202,7 +176,7 @@
 
 (defn begin? [exp] (tagged-list? exp 'begin))
 (defn get-sequence [exp] (rest exp))
-(defn last-expression? [exp] (empty? (first (rest exp))))
+(defn last-expression? [exp] (empty? (rest exp)))
 (defn first-expression [exp] (first exp))
 (defn rest-expressions [exp] (rest exp))
 
@@ -255,7 +229,93 @@
     (concat (list (list 'lambda let-vars body))
             let-actions)))
 
+
+(defn and? [exp] (tagged-list? exp 'and))
+(defn and-clauses [exp] (rest exp))
+(defn and-action [clauses] (first clauses))
+
+(defn and->combination [exp]
+  (expand-and-clauses (and-clauses exp)))
+
+(defn expand-and-clauses [clauses]
+  (let [curr-clause (and-action clauses)]
+    (if (empty? clauses)
+      'true
+      (if (last-expression? clauses)
+        (make-if curr-clause
+                 curr-clause
+                 'false)
+        (make-if curr-clause
+                 (expand-and-clauses (rest clauses))
+                 'false)))))
+
+(defn or? [exp] (tagged-list? exp 'or))
+(defn or-clauses [exp] (rest exp))
+(defn or-action [clauses] (first clauses))
+
+(defn or->combination [exp]
+  (expand-or-clauses (or-clauses exp)))
+
+(defn expand-or-clauses [clauses]
+  (let [curr-clause (or-action clauses)]
+    (if (empty? clauses)
+      'false
+      (if (last-expression? clauses)
+        (make-if curr-clause
+                 curr-clause
+                 'false)
+        (make-if curr-clause
+                 curr-clause
+                 (expand-or-clauses (rest clauses)))))))
+
+(def primitives
+  (list {'+ +}
+        {'- -}
+        {'/ /}
+        {'* *}
+        {'true true}
+        {'True true}
+        {'false false}
+        {'False false}
+        {'> >}
+        {'< <}
+        {'<= <=}
+        {'>= >=}
+        {'= =}
+        {'length count}
+        {'eq? =}
+        {'null? empty-coll?}
+        {'nil (list)}
+        {'apply apply}
+        {'remainder rem}
+        {'car first}
+        {'cdr rest}
+        {'list list}
+        {'cons cons}
+        {'not not}
+        {'pair? seq?}
+        {'append concat}
+        {'display print}
+        {'newline (fn [] (println ""))}))
+
+(defn init-env [env]
+  (let [vars (map (comp first keys) primitives)
+        vals (map (fn [primitive] (list 'primitive ((comp first vals) primitive))) primitives)]
+    (environ/extend-env vars vals env)))
+
+
+
+(defn driver-loop [env]
+  (print ">>> ")
+  (flush)
+  (println (eval (read) env))
+  (flush)
+  (driver-loop env)
+  )
+
 (defn -main
   "Runs the read-eval-print-loop"
-  [& args])
+  [& args]
+  (let [env (init-env environ/empty-env)]
+    (driver-loop env)))
 
