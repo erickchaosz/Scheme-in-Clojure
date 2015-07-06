@@ -303,7 +303,7 @@
         vals (map (fn [primitive] (list 'primitive ((comp first vals) primitive))) primitives)]
     (environ/extend-env vars vals env)))
 
-
+(def initial-env (init-env environ/empty-env))
 
 (defn driver-loop [env]
   (print ">>> ")
@@ -316,6 +316,5 @@
 (defn -main
   "Runs the read-eval-print-loop"
   [& args]
-  (let [env (init-env environ/empty-env)]
-    (driver-loop env)))
+  (driver-loop initial-env))
 
