@@ -22,7 +22,8 @@
          lambda? lambda-params lambda-body make-lambda
          begin? eval-sequence last-expression? first-expression rest-expressions get-sequence
          cond? cond-clauses cond-predicate cond-body last-cond? cond->if expand-cond-clauses
-         let? let->combination expand-let-clauses
+         let? let->combination expand-named-let  expand-let-clauses
+         let*? let*->nested-lets expand-let*-clauses
          and? expand-and-clauses and->combination
          or? expand-or-clauses or->combination
          application?
@@ -30,6 +31,7 @@
 
 
 (defn eval
+  "Evaluate expression according to the current environment"
   [exp env]
   (cond (self-evaluating? exp) exp
         (nil? exp) (list)
@@ -40,6 +42,7 @@
         (if? exp) (eval-if exp env)
         (cond? exp) (eval (cond->if exp) env)
         (let? exp) (eval (let->combination exp) env)
+        (let*? exp) (eval (let*->nested-lets exp) env)
         (lambda? exp) (make-procedure (lambda-params exp)
                                       (lambda-body exp)
                                       env)
@@ -51,6 +54,7 @@
                             (eval exp env)) (operands exp)))))
 
 (defn apply
+  "Apply procedure to arguments"
   [procedure arguments]
   (if (primitive-proc? procedure)
     (apply-in-underlying-clojure (primitive-body procedure) arguments)
@@ -76,6 +80,7 @@
   (rest exp))
 
 (defn make-procedure
+  "Make a compound procedure"
   [parameters body env]
   (list 'procedure parameters body env))
 
@@ -88,6 +93,7 @@
 (defn proc-env [exp] (first (rest (rest (rest exp)))))
 
 (defn self-evaluating?
+  "Self evaluating expressions return itself"
   [exp]
   (cond
    (number? exp) true
@@ -97,8 +103,9 @@
    :else false))
 
 (defn variable?
+  "Look for variables in the environment"
   [exp]
-  (or (symbol? exp) (nil? exp)))
+  (symbol? exp))
 
 (defn tagged-list?
   [exp tag]
@@ -107,6 +114,7 @@
     false))
 
 (defn quoted?
+  "Quoted expressions return the quoted text"
   [exp]
   (tagged-list? exp 'quote))
 
@@ -122,6 +130,7 @@
 (defn assignment-val [exp] (first (rest (rest exp))))
 
 (defn eval-assignment
+  "Eval and set variable in the environment"
   [exp env]
   (let [var (assignment-var exp)
         val (eval (assignment-val exp) env)]
@@ -148,6 +157,7 @@
       def-body)))
 
 (defn eval-definition
+  "Eval the value and define the variable in the environment"
   [exp env]
   (let [var (definition-var exp)
         val (eval (definition-val exp) env)]
@@ -163,15 +173,22 @@
 (defn make-if [pred action alternative] (list 'if pred action alternative))
 
 (defn eval-if
+  "Eval predicate and then either eval the action or the alternative"
   [exp env]
   (if (eval (if-predicate exp) env)
     (eval (if-action exp) env)
     (eval (if-alternative exp) env)))
 
-(defn lambda? [exp] (tagged-list? exp 'lambda))
+(defn lambda?
+  "A procedure will be made from lambda"
+  [exp]
+  (tagged-list? exp 'lambda))
+
 (defn lambda-params [exp] (first (rest exp)))
 (defn lambda-body [exp] (rest (rest exp)))
-(defn make-lambda [params body] (list 'lambda params body))
+(defn make-lambda
+  [params body]
+  (list 'lambda params body))
 
 
 (defn begin? [exp] (tagged-list? exp 'begin))
@@ -181,13 +198,17 @@
 (defn rest-expressions [exp] (rest exp))
 
 (defn eval-sequence
+  "Evaluate a sequence by eval-ing each action"
   [exp env]
   (if (last-expression? exp)
     (eval (first-expression exp) env)
     (do (eval (first-expression exp) env)
         (recur (rest exp) env ))))
 
-(defn sequence->exp [exp]
+(defn sequence->exp
+  "Turns a single sequence by getting the first exp,
+  sequences into exp by adding begin"
+  [exp]
   (if (last-expression? exp)
     (first exp)
     (cons 'begin exp)))
@@ -201,7 +222,9 @@
 (defn cond->if [exp]
   (expand-cond-clauses (cond-clauses exp)))
 
-(defn expand-cond-clauses [clauses]
+(defn expand-cond-clauses
+  "Expand the cond clause by making if statements"
+  [clauses]
   (let [curr-clause (first clauses)
         curr-body (sequence->exp (cond-body curr-clause))]
     (if (empty? clauses)
@@ -216,18 +239,58 @@
 (defn let-clauses [exp] (rest exp))
 (defn let-bindings [exp] (first exp))
 (defn let-body [exp] (rest exp))
+(defn named-let? [exp] (symbol? (first (rest exp))))
+(defn named-let-var [exp] (first exp))
+(defn make-let [bindings body] (list 'let bindings body))
 
 (defn let->combination [exp]
-  (let [clauses (let-clauses exp)
-        bindings (let-bindings clauses)
-        body (sequence->exp (let-body clauses))]
-    (expand-let-clauses bindings body)))
+  (if (named-let? exp)
+    (let [exp (rest exp)
+          var (named-let-var exp)
+          clauses (let-clauses exp)
+          bindings (let-bindings clauses)
+          body (sequence->exp (let-body clauses))]
+      (expand-named-let var bindings body))
+    (let [clauses (let-clauses exp)
+          bindings (let-bindings clauses)
+          body (sequence->exp (let-body clauses))]
+      (expand-let-clauses bindings body))))
 
-(defn expand-let-clauses [bindings body]
+(defn expand-named-let [var bindings body]
   (let [let-vars (map first bindings)
-        let-actions (map (comp first rest) bindings)]
+        let-vals (map (comp first rest) bindings)]
+    (sequence->exp (list (list 'define (concat (list var) let-vars)
+                               body)
+                         (concat (list var) let-vals)))))
+
+(defn expand-let-clauses
+  "Let can be derived to lambda expressions applied to some parameters"
+  [bindings body]
+  (let [let-vars (map first bindings)
+        let-vals (map (comp first rest) bindings)]
     (concat (list (list 'lambda let-vars body))
-            let-actions)))
+            let-vals)))
+
+(defn let*? [exp] (tagged-list? exp 'let*))
+(defn let*-clauses [exp] (rest exp))
+(defn let*-bindings [exp] (first exp))
+(defn let*-body [exp] (rest exp))
+
+(defn let*->nested-lets [exp]
+  (let [clauses (let*-clauses exp)
+        bindings (let*-bindings clauses)
+        body (sequence->exp (let*-body clauses))]
+    (expand-let*-clauses bindings body)))
+
+(defn expand-let*-clauses
+  [bindings body]
+  (if (empty? bindings)
+    body
+    (let [curr-binding (first bindings)]
+      (make-let (list  curr-binding)
+                (expand-let*-clauses (rest bindings)
+                                     body)))))
+
 
 
 (defn and? [exp] (tagged-list? exp 'and))

@@ -262,5 +262,15 @@
          'hello "(or (quote hello) (quote world))"
          1 "(if nil 1 2)"
          1 "(if 0 1 2)"
-         
+         4 "(let* ((a 1)
+                   (b (+ a 1))
+                   (c (+ b 2))) c)"
+         'fib "(define (fib n)
+                 (let fib-iter ((a 1)
+                                (b 0)
+                                (count n))
+                   (if (= count 0)
+                       b
+                       (fib-iter (+ a b) a (- count 1)))))"
+         13 "(fib 7)"
          )))
