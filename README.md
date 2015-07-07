@@ -14,6 +14,8 @@ based of the SICP textbook.
 * if
 * cond
 * let
+* named-let
+* let*
 * begin
 * quote
 * set!
